@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Label Lag &middot; Sheina Pribadi</title>
+  <meta name="description" content="What a fraud model's score looks like in the weeks before the disputes arrive. A small study inspired by Stripe Radar's work on delayed labels." />
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <header class="masthead">
+      <div>
+        <p class="kicker">A working note &middot; November 2026</p>
+        <h1>Label Lag</h1>
+      </div>
+      <p class="mast-meta">
+        Sheina Pribadi<br />
+        UC Berkeley &middot; Haas + Data Science &rsquo;28<br />
+        <a href="https://sheinapribadi-star.github.io/">Portfolio</a>
+        &middot;
+        <a href="https://github.com/sheinapribadi-star/label-lag">Code</a>
+      </p>
+    </header>
+
+    <p class="lede">
+      A fraud model can look better than it is, because the truth is still in the mail.
+      When a stolen card is used, it can take weeks for the cardholder to notice and file a dispute.
+      Until that report arrives, the payment sits in your training data as a legitimate charge.
+    </p>
+    <p class="source">
+      The idea comes from
+      <a href="https://stripe.dev/blog/scaling-radar-fighting-fraud-with-agent-assisted-machine-learning">Scaling Radar: Fighting fraud with agent-assisted machine learning</a>
+      by Ryan Drapeau and Sai Samant (Stripe, 19 October 2026). In that post, a model trained on a much larger slice of the network looked better in early tests, then had to be rolled back once delayed fraud reports arrived.
+    </p>
+    <p class="disclaimer" id="disclaimer">Constructed sample, not Stripe data. Fraud is overrepresented so the lag is visible.</p>
+
+    <section class="clock" aria-labelledby="clock-title">
+      <div class="clock-head">
+        <h2 id="clock-title">Watch the labels mature</h2>
+        <p class="readout" id="readout">Loading sample&hellip;</p>
+      </div>
+      <div class="chart-wrap">
+        <svg id="chart" viewBox="0 0 820 390" role="img" aria-labelledby="chart-title chart-desc">
+          <title id="chart-title">Apparent recall as disputes arrive</title>
+          <desc id="chart-desc">
+            Apparent recall for two training rules over 56 days, as fraud reports arrive for one evaluation week.
+          </desc>
+        </svg>
+        <div class="legend">
+          <span><i class="swatch now"></i>Fit now, apparent recall</span>
+          <span><i class="swatch wait"></i>Wait 6 weeks, apparent recall</span>
+          <span><i class="swatch true"></i>True recall once every dispute in the sample has arrived</span>
+        </div>
+      </div>
+      <div class="slider-row">
+        <label for="day">
+          <span>Disputes arrived through day <strong id="day-label">0</strong></span>
+          <span>0 to 56 days after the evaluation week</span>
+        </label>
+        <input id="day" type="range" min="0" max="56" value="0" step="1" />
+      </div>
+      <div class="metrics" id="metrics"></div>
+      <div class="models">
+        <article class="model now">
+          <h3>Fit now, with the labels you have</h3>
+          <p>
+            Train on every payment in a 10-week window, using only the reports that have arrived by training day.
+            Recent weeks count more, so the model can chase new attacks. Those same weeks are where labels are least trustworthy.
+          </p>
+        </article>
+        <article class="model wait">
+          <h3>Train only on mature weeks</h3>
+          <p>
+            Drop the most recent six weeks and train only on payments that are old enough for most disputes to have arrived.
+            Labels are more trustworthy. The window is smaller, and a little stale.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section class="desk" aria-labelledby="desk-title">
+      <h2 id="desk-title">A charge that looked safe</h2>
+      <p class="intro">
+        The Stripe post describes using model explanations to see which features pushed a score up or down on missed fraud.
+        Below are the late-reported stolen-card charges from the evaluation week. Several of them were left through by the &ldquo;fit now&rdquo; rule because a long clean history on other merchants made the charge look ordinary.
+      </p>
+      <div class="desk-grid">
+        <div class="case-list" id="cases" role="listbox" aria-label="Late-reported evaluation charges"></div>
+        <article class="case" id="case" aria-live="polite"></article>
+      </div>
+    </section>
+
+    <section class="notes" aria-labelledby="notes-title">
+      <h2 id="notes-title">How this sample was built</h2>
+      <p>
+        The evaluation week has 280 charges, of which 42 are fraud: 14 obvious card-testing cases that get reported quickly, and 28 stolen-card cases that usually take three to eight weeks to be reported.
+        In live card payments, fraud is closer to 1 in 1,000. This sample is deliberately dense so a short demo can show the lag.
+      </p>
+      <p>
+        Both rules are logistic models scored at a frozen 2% false-positive operating point, chosen on the mature training weeks where labels can be trusted.
+        The metric I care about is the <strong>label-lag gap</strong>: apparent recall on day 0 minus recall once the labels have matured.
+        A training rule holds up if that gap is small, and if mature recall stays high.
+      </p>
+      <p>
+        On this sample, the mature-weeks model caught every evaluation-week fraud case, and the &ldquo;fit now&rdquo; model missed five of the late-reported ones.
+        A live system would not go 42 for 42. The useful result is the gap, and the fact that the gap only appears after the disputes arrive.
+      </p>
+      <p>
+        Reproduce the sample with <code>python3 generate_data.py</code>. The generating process and the design decisions live in the <a href="https://github.com/sheinapribadi-star/label-lag">README</a>.
+      </p>
+    </section>
+
+    <footer>
+      <span>Sheina Pribadi &middot; Label Lag, 2026</span>
+      <span>
+        <a href="https://sheinapribadi-star.github.io/">sheinapribadi-star.github.io</a>
+        &middot;
+        <a href="https://stripe.dev/blog/scaling-radar-fighting-fraud-with-agent-assisted-machine-learning">Source post</a>
+      </span>
+    </footer>
+  </div>
+  <script src="./app.js"></script>
+</body>
+</html>
