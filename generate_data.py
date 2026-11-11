@@ -358,9 +358,10 @@ def main():
 
     s_now_tr = scores(theta_now, X_train_s)
     s_wait_tr = scores(theta_wait, X_train_s)
-    # Operating point: 2% FPR on the mature slice, where labels can be trusted.
-    t_now = threshold_for_fpr(s_now_tr[mature_idx], y_true[mature_idx], OPERATING_FPR)
-    t_wait = threshold_for_fpr(s_wait_tr[mature_idx], y_true[mature_idx], OPERATING_FPR)
+        # Operating point: 2% FPR on the mature slice, using only the labels that
+    # had arrived by training day (no peeking at disputes that come later).
+    t_now = threshold_for_fpr(s_now_tr[mature_idx], y_visible[mature_idx], OPERATING_FPR)
+    t_wait = threshold_for_fpr(s_wait_tr[mature_idx], y_visible[mature_idx], OPERATING_FPR)
 
     X_eval = design_matrix(eval_rows)
     X_eval_s = (X_eval - means) / scales
@@ -423,7 +424,8 @@ def main():
                 "merchant": row["merchant"], "amount_usd": row["amount_usd"],
                 "email": row["email"], "card": row["card"], "ip": row["ip"],
                 "is_fraud": False, "report_delay": None,
-                "related_to": p["id"], "share": "card" if row["card"] == p["card"] else "ip",
+                                "related_to": p["id"],
+                "share": "card and IP" if row["ip"] == p["ip"] else "card",
             })
             used += 1
 
@@ -436,7 +438,10 @@ def main():
         "train_visible_fraud_at_fit": int(y_visible.sum()),
         "train_hidden_fraud_at_fit": int((y_true - y_visible).sum()),
         "n_mature_train": int(len(mature_idx)),
-        "eval_fraud": int(y_end.sum()),
+                "eval_fraud": int(y_end.sum()),
+        "eval_legit": int((1 - y_end).sum()),
+        "legit_flagged_now": int(((s_now >= t_now) & (y_end == 0)).sum()),
+        "legit_flagged_wait": int(((s_wait >= t_wait) & (y_end == 0)).sum()),
         "eval_obvious": int(sum(1 for r in eval_rows if r["kind"] == "obvious")),
         "eval_camouflage": int(sum(1 for r in eval_rows if r["kind"] == "camouflage")),
         "mature_wait_days": MATURE_WAIT,

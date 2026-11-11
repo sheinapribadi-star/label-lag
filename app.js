@@ -89,13 +89,14 @@
       </div>
       <div class="metric">
         <div class="lbl">Wait 6 weeks, apparent</div>
-        <div class="val wait">${pct(cur.wait_apparent_recall)}</div>
-        <div class="sub">True recall ${pct(cur.wait_true_recall)}</div>
+                <div class="val wait">${pct(cur.wait_apparent_recall)}</div>
+        <div class="sub">True recall ${pct(cur.wait_true_recall)}. ${summary.legit_flagged_wait} false alarms vs ${summary.legit_flagged_now} for Fit now</div>
       </div>
       <div class="metric">
         <div class="lbl">Label-lag gap</div>
         <div class="val now">${pct(summary.now_label_lag_gap)}</div>
-        <div class="sub">Fit now: day 0 minus day 56. Wait: ${pct(summary.wait_label_lag_gap)}</div>
+                <div class="sub">Fit now: day 0 minus day 56. Wait: ${pct(summary.wait_label_lag_gap)}</div>
+      
       </div>`;
   }
 
@@ -134,8 +135,20 @@
     let verdict;
     if (payment.kind === "obvious") {
       verdict = `A fast, obvious pattern: a throwaway email, a new card, and a small test-sized charge. Both rules flagged it. The report arrived after ${daysWord(delay)}.`;
-    } else if (!payment.flagged_now && payment.flagged_wait) {
-      verdict = `Fit now left this charge through. The model trained only on mature weeks flagged it. The cardholder reported the dispute ${daysWord(delay)} later.`;
+        } else if (!payment.flagged_now && payment.flagged_wait) {
+      const hid = (e) => ((e && e.parts) || []).find((x) => x.id === "history_but_new_here");
+      const hn = hid(payment.explain_now), hw = hid(payment.explain_wait);
+            const CALM = {
+        velocity: "only one or two charges this hour", amount_shape: "a normal amount", network_history: "years of clean history",
+        ip_cards: "few cards on this IP", merchant_dispute: "a low-dispute merchant", new_email: "an established email",
+        new_card: "an established card", throwaway_email: "a normal email address", country_mismatch: "matching countries",
+        name_mismatch: "a name that matches the email",
+      };
+      const downs = parts.filter((x) => x.contribution < 0 && CALM[x.id]).slice(0, 2).map((x) => CALM[x.id]);
+      const why = hn && hw
+        ? ` Both models saw the hiding pattern, clean history elsewhere and a first charge here. Fit now gave it less weight (+${hn.contribution.toFixed(1)} vs +${hw.contribution.toFixed(1)}), because many recent charges like this were still labeled legitimate when it trained.${downs.length ? ` Ordinary details (${downs.join(" and ")}) were enough to keep it under the line.` : ""}`
+        : "";
+      verdict = `Fit now left this charge through. The model trained only on mature weeks flagged it. The cardholder reported the dispute ${daysWord(delay)} later.${why}`;
     } else if (payment.flagged_now && payment.flagged_wait) {
       verdict = `Both rules flagged this stolen-card charge. The dispute itself did not arrive for ${daysWord(delay)}.`;
     } else {
@@ -156,7 +169,7 @@
 
     const relTable = related.length
       ? `<div class="related">
-          <h3>Related earlier charges on the same card</h3>
+          <h3>Earlier charges on the same card at other merchants</h3>
           <table>
             <thead><tr><th>Day</th><th>Merchant</th><th>Amount</th><th>Shared</th></tr></thead>
             <tbody>
@@ -193,8 +206,9 @@
         <div><dt>Wait 6 weeks score</dt><dd>${payment.score_wait.toFixed(3)}</dd></div>
       </dl>
       <div class="explain">
-        <h3>What pushed the Fit now score up or down</h3>
+                <h3>What pushed the Fit now score up or down</h3>
         <div class="bars">${barRows(parts)}</div>
+        <p class="bars-note">Pushes are on the log-odds scale, measured against an average charge. The model's starting point is left out. It is strongly negative because most charges are legitimate, so a charge is flagged only when the pushes add up past the line.</p>
       </div>
       ${relTable}`;
   }

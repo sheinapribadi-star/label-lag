@@ -22,7 +22,7 @@ This project is not a reimplementation of Radar, and it does not use Stripe data
 
 Imagine you are reviewing a model on Monday. Of the fraud you know about so far, it caught almost all of it. Two weeks later the same model, scored the same way, looks worse. Nothing about the model changed. The labels did. Stolen-card disputes arrived for charges the model had treated as legitimate, both when it was trained and when it was first evaluated.
 
-The hard cases in this sample follow a pattern from the Stripe post: a card that is new to one business can still have years of clean history elsewhere on the network. That history pushes the score down. The charge looks ordinary. The report arrives a month later.
+The hard cases in this sample follow a pattern from the Stripe post: a card that is new to one business can still have years of clean history elsewhere on the network. In this sample, that combination (clean history elsewhere, first charge here) is the main signal for late-reported fraud. The "fit now" model still learns it, but with less weight, because many recent charges with that pattern were labeled legitimate on training day. That matches the post: the bigger model "saw many more examples teaching it that late-reported fraud patterns were legitimate." With the signal turned down, ordinary details like a single charge this hour and a normal amount are enough to keep the charge under the line. The report arrives a month later.
 
 ## Design decisions
 
@@ -31,9 +31,9 @@ Two training rules, both taken from the tradeoff in the post.
 1. **Fit now, with the labels you have.** Train on every payment in a 10-week window, using only the reports that have arrived by training day. Recent weeks count more, so the model can chase new attacks. Those same weeks are where labels are least trustworthy.
 2. **Train only on mature weeks.** Drop the most recent six weeks. Train only on payments that are old enough for most disputes to have arrived. Labels are more trustworthy. The window is smaller, and a little stale.
 
-Both rules are logistic models with the same features, including an explicit one for the hiding pattern: clean history on other merchants, combined with a first charge at this merchant. They are scored at a frozen 2% false-positive operating point, chosen on the mature training weeks, where labels can be trusted.
+Both rules are logistic models with the same features, including an explicit one for the hiding pattern: clean history on other merchants, combined with a first charge at this merchant. They are scored at a frozen 2% false-positive operating point, chosen on the mature training weeks using only the reports that had arrived by training day. (An earlier version picked the threshold with every eventual report, which a real team would not have yet. Fixing it moved the thresholds slightly and changed none of the results below.)
 
-The demo also shows, for each late-reported charge, the features that pushed the "fit now" score up or down, plus earlier charges on the same card at other merchants. That is the explanation table from the 2023 post, applied to the missed-fraud investigation in the 2026 post.
+The demo also shows, for each late-reported charge, the features that pushed the "fit now" score up or down, plus earlier charges on the same card at other merchants (generated with the sample, like everything else). That is the explanation table from the 2023 post, applied to the missed-fraud investigation in the 2026 post.
 
 I did not use maps, even though the original Radar write-up mentions billing and shipping maps. City and country are shown as text.
 
@@ -45,8 +45,9 @@ A training rule holds up if that gap is small and mature recall stays high. On t
 
 - Fit now starts at 100% apparent recall, then falls to 88.1%. Label-lag gap: 11.9 percentage points. It misses 5 of 28 late-reported stolen-card cases.
 - Wait 6 weeks stays at 100% as the labels arrive. Label-lag gap: 0. It catches all 42 evaluation-week fraud cases.
+- The catches are not free. Wait 6 weeks flags 4 of 238 legitimate charges, against 2 for Fit now. Both stay under the 2% target.
 
-A live system would not go 42 for 42. The useful result is the gap, and the fact that the gap only appears after the disputes arrive. Early evaluation, on its own, would have called the two rules tied.
+A live system would not go 42 for 42. The sample is built so this failure can happen (stolen-card cases get more common in recent weeks, while their reports are still in the mail), so it demonstrates the mechanism. It does not measure how often or how badly it happens on real traffic. The useful result is the gap, and the fact that the gap only appears after the disputes arrive. Early evaluation, on its own, would have called the two rules tied.
 
 ## About the sample
 

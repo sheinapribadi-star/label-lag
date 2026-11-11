@@ -560,3 +560,5 @@ footer {
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+.bars-note { margin-top: 0.5rem; font-size: 0.78rem; color: var(--ink-soft); line-height: 1.4; }

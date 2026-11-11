@@ -87,7 +87,7 @@
       <h2 id="desk-title">A charge that looked safe</h2>
       <p class="intro">
         The Stripe post describes using model explanations to see which features pushed a score up or down on missed fraud.
-        Below are the late-reported stolen-card charges from the evaluation week. Several of them were left through by the &ldquo;fit now&rdquo; rule because a long clean history on other merchants made the charge look ordinary.
+        Below are the late-reported stolen-card charges from the evaluation week. Five of them were left through by the &ldquo;fit now&rdquo; rule. It had learned to give the hiding pattern, clean history elsewhere and a first charge here, less weight, because many recent charges with that pattern were still labeled legitimate when it trained.
       </p>
       <div class="desk-grid">
         <div class="case-list" id="cases" role="listbox" aria-label="Late-reported evaluation charges"></div>
@@ -102,13 +102,15 @@
         In live card payments, fraud is closer to 1 in 1,000. This sample is deliberately dense so a short demo can show the lag.
       </p>
       <p>
-        Both rules are logistic models scored at a frozen 2% false-positive operating point, chosen on the mature training weeks where labels can be trusted.
+        Both rules are logistic models scored at a frozen 2% false-positive operating point, chosen on the mature training weeks using only the reports that had arrived by training day.
         The metric I care about is the <strong>label-lag gap</strong>: apparent recall on day 0 minus recall once the labels have matured.
         A training rule holds up if that gap is small, and if mature recall stays high.
       </p>
       <p>
         On this sample, the mature-weeks model caught every evaluation-week fraud case, and the &ldquo;fit now&rdquo; model missed five of the late-reported ones.
-        A live system would not go 42 for 42. The useful result is the gap, and the fact that the gap only appears after the disputes arrive.
+        It paid for that with more false alarms: 4 legitimate charges flagged, against 2 for &ldquo;fit now,&rdquo; out of 238. Both stay under the 2% target.
+          A live system would not go 42 for 42. The sample is built so this failure can happen, so it shows the mechanism, not how often it happens in practice.
+          The useful result is the gap, and the fact that the gap only appears after the disputes arrive.
       </p>
       <p>
         Reproduce the sample with <code>python3 generate_data.py</code>. The generating process and the design decisions live in the <a href="https://github.com/sheinapribadi-star/label-lag">README</a>.
